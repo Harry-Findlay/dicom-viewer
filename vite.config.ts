@@ -17,7 +17,7 @@ export default defineConfig({
     outDir: 'dist',
     target: 'esnext',
     rollupOptions: {
-      external: ['sharp'],
+      external: ['sharp', '@icr/polyseg-wasm'],
     },
   },
   server: {
