@@ -3,24 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [
-    react(),
-    // Stub out WASM imports that Rollup can't handle natively.
-    // @icr/polyseg-wasm is only needed for segmentation (not used here).
-    {
-      name: 'stub-wasm',
-      resolveId(id) {
-        if (id.endsWith('.wasm') || id.includes('@icr/polyseg-wasm')) {
-          return id
-        }
-      },
-      load(id) {
-        if (id.endsWith('.wasm') || id.includes('@icr/polyseg-wasm')) {
-          return 'export default null; export const ICRPolySeg = null;'
-        }
-      },
-    },
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src/renderer'),
@@ -28,12 +11,7 @@ export default defineConfig({
   },
   base: './',
   optimizeDeps: {
-    exclude: ['sharp', '@icr/polyseg-wasm'],
-    include: [
-      '@cornerstonejs/core',
-      '@cornerstonejs/tools',
-      '@cornerstonejs/dicom-image-loader',
-    ],
+    exclude: ['sharp'],
   },
   build: {
     outDir: 'dist',
