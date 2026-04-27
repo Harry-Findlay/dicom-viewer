@@ -5,9 +5,6 @@ on:
   push:
     branches: [ main ]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: macos-latest
@@ -20,12 +17,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm' # Speeds up future runs
 
       - name: Install dependencies
-        run: npm install
+        # 'npm ci' is preferred for CI/CD as it's faster and stricter than 'install'
+        run: npm ci 
 
       - name: Build macOS app
         run: npm run dist:mac
+        env:
+          # This disables code signing for now so you can see if the build actually works
+          CSC_IDENTITY_AUTO_DISCOVERY: false 
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
