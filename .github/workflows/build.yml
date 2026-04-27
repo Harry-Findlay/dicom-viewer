@@ -28,9 +28,6 @@ jobs:
           rm -rf dist
           npm run build
           npm run dist:mac
-
-      - name: Build macOS app
-        run: npm run dist:mac
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This gives the builder permission
           CSC_IDENTITY_AUTO_DISCOVERY: false        # Keeps code signing disabled
