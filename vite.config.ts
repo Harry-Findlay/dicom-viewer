@@ -18,16 +18,6 @@ export default defineConfig({
     target: 'esnext',
     rollupOptions: {
       external: ['sharp'],
-      output: {
-        manualChunks: {
-          cornerstone: [
-            '@cornerstonejs/core',
-            '@cornerstonejs/tools',
-            '@cornerstonejs/dicom-image-loader',
-          ],
-          react: ['react', 'react-dom'],
-        },
-      },
     },
   },
   server: {
