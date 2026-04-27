@@ -3,7 +3,24 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Stub out WASM imports that Rollup can't handle natively.
+    // @icr/polyseg-wasm is only needed for segmentation (not used here).
+    {
+      name: 'stub-wasm',
+      resolveId(id) {
+        if (id.endsWith('.wasm') || id.includes('@icr/polyseg-wasm')) {
+          return id
+        }
+      },
+      load(id) {
+        if (id.endsWith('.wasm') || id.includes('@icr/polyseg-wasm')) {
+          return 'export default null; export const ICRPolySeg = null;'
+        }
+      },
+    },
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src/renderer'),
@@ -11,9 +28,7 @@ export default defineConfig({
   },
   base: './',
   optimizeDeps: {
-    exclude: ['sharp'],
-    // Force Cornerstone packages to be pre-bundled together so
-    // circular deps are resolved in the correct order
+    exclude: ['sharp', '@icr/polyseg-wasm'],
     include: [
       '@cornerstonejs/core',
       '@cornerstonejs/tools',
@@ -23,7 +38,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'esnext',
-    // Keep Cornerstone in one chunk to avoid GIA-before-init crash
     rollupOptions: {
       external: ['sharp'],
       output: {
