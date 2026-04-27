@@ -19,12 +19,31 @@ export default defineConfig({
     rollupOptions: {
       external: ['sharp', '@icr/polyseg-wasm'],
       onwarn(warning, warn) {
-        // Suppress the unresolved @icr/polyseg-wasm warning — it's external intentionally
+        // Suppress expected warnings from Cornerstone's circular internals
+        if (warning.code === 'CIRCULAR_DEPENDENCY') return
+        if (warning.code === 'INVALID_ANNOTATION_TARGET') return
         if (
-          warning.code === 'UNRESOLVED_IMPORT' &&
-          warning.message?.includes('polyseg-wasm')
+          warning.message?.includes('polyseg-wasm') ||
+          warning.message?.includes('dynamic import will not move') ||
+          warning.message?.includes('circular dependency between chunks')
         ) return
         warn(warning)
+      },
+      output: {
+        // Keep all Cornerstone code in one chunk so internal module
+        // initialization order is preserved — prevents naA/GIA crashes
+        manualChunks(id) {
+          if (
+            id.includes('node_modules/@cornerstonejs') ||
+            id.includes('node_modules/dicom-parser') ||
+            id.includes('node_modules/dcmjs')
+          ) {
+            return 'cornerstone'
+          }
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'react'
+          }
+        },
       },
     },
   },
