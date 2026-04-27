@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react'
+import { imageLoader } from '@cornerstonejs/core'
 import { useStore } from '../store/appStore'
 import styles from '../styles/SliceStrip.module.css'
 
@@ -33,7 +34,6 @@ export function SliceStrip() {
     if (!imageId) return
 
     try {
-      const { imageLoader } = await import('@cornerstonejs/core')
       const image = await imageLoader.loadAndCacheImage(imageId)
       // Abort if series changed while loading
       if (!activeSeries || activeSeries.seriesUID !== seriesUID) return
