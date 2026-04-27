@@ -1,0 +1,39 @@
+name: Build Electron App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm' # Speeds up future runs
+
+      - name: Install dependencies
+        run: npm ci 
+
+      - name: Clean and Build
+        # Force a clean build to prevent stale minification maps
+        run: |
+          rm -rf dist
+          npm run build
+          npm run dist:mac
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This gives the builder permission
+          CSC_IDENTITY_AUTO_DISCOVERY: false        # Keeps code signing disabled
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-build
+          path: release/
