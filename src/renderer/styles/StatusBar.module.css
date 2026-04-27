@@ -1,0 +1,37 @@
+.bar {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.left, .right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sep {
+  color: var(--border-strong);
+}
+
+.loading {
+  color: var(--accent);
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+
+.hint {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+@keyframes pulse {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}

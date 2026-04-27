@@ -1,0 +1,19 @@
+.viewportWrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewport {
+  width: 100%;
+  height: 100%;
+}
+
+/* Do NOT override canvas size — Cornerstone manages it. Removing
+   width/height overrides fixes the stretch-to-fill bug. */
