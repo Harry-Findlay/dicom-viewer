@@ -18,6 +18,14 @@ export default defineConfig({
     target: 'esnext',
     rollupOptions: {
       external: ['sharp', '@icr/polyseg-wasm'],
+      onwarn(warning, warn) {
+        // Suppress the unresolved @icr/polyseg-wasm warning — it's external intentionally
+        if (
+          warning.code === 'UNRESOLVED_IMPORT' &&
+          warning.message?.includes('polyseg-wasm')
+        ) return
+        warn(warning)
+      },
     },
   },
   server: {
