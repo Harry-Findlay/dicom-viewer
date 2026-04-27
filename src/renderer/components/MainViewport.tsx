@@ -45,11 +45,6 @@ export function MainViewport() {
 
     // Stamp new annotations with the current colour when user finishes drawing
     listenForNewAnnotations(() => useStore.getState().annotationColor)
-
-    // Notify engine on container resize (fullscreen etc.)
-    const ro = new ResizeObserver(() => { try { engine.resize(true, true) } catch {} })
-    ro.observe(containerRef.current)
-    return () => ro.disconnect()
   }, [])
 
   // ── Wheel (non-passive, reads store directly) ────────────────────────────────

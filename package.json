@@ -16,39 +16,32 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "lint": "eslint src --ext .ts,.tsx"
   },
-  "keywords": [
-    "dicom",
-    "medical",
-    "imaging",
-    "electron"
-  ],
+  "keywords": ["dicom", "medical", "imaging", "electron"],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@cornerstonejs/core": "1.72.1",
-    "@cornerstonejs/dicom-image-loader": "1.72.1",
     "@cornerstonejs/tools": "1.72.1",
-    "clsx": "2.1.1",
+    "@cornerstonejs/dicom-image-loader": "1.72.1",
     "dcmjs": "0.29.8",
     "dicom-parser": "1.8.21",
-    "lucide-react": "0.427.0",
+    "sharp": "0.33.4",
+    "zustand": "4.5.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "sharp": "0.33.4",
-    "zustand": "4.5.2"
+    "lucide-react": "0.427.0",
+    "clsx": "2.1.1"
   },
   "devDependencies": {
-    "@types/node": "20.14.0",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
+    "@types/node": "20.14.0",
     "@vitejs/plugin-react": "4.3.1",
     "concurrently": "8.2.2",
     "electron": "31.3.1",
     "electron-builder": "24.13.3",
     "typescript": "5.5.3",
     "vite": "5.4.21",
-    "vite-plugin-top-level-await": "^1.6.0",
-    "vite-plugin-wasm": "^3.6.0",
     "wait-on": "7.2.0"
   },
   "build": {
@@ -66,27 +59,18 @@
     "mac": {
       "category": "public.app-category.medical",
       "icon": "build/icon.icns",
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": ["dmg", "zip"],
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "win": {
       "icon": "build/icon.ico",
-      "target": [
-        "nsis",
-        "portable"
-      ]
+      "target": ["nsis", "portable"]
     },
     "linux": {
       "icon": "build/icon.png",
-      "target": [
-        "AppImage",
-        "deb"
-      ]
+      "target": ["AppImage", "deb"]
     },
     "nsis": {
       "oneClick": false,

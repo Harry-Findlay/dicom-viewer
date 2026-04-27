@@ -96,7 +96,14 @@ export async function initialiseCornerstonejs() {
   addTool(PanTool); addTool(ZoomTool); addTool(WindowLevelTool)
   addTool(LengthTool); addTool(AngleTool)
   addTool(EllipticalROITool); addTool(RectangleROITool)
-  addTool(ArrowAnnotateTool); addTool(MagnifyTool)
+  addTool(MagnifyTool)
+
+  // ArrowAnnotate: pass silent text callbacks via addTool configuration
+  // so prompt() is never called (it's blocked in Electron)
+  addTool(ArrowAnnotateTool, {
+    getTextCallback: (cb: (text: string) => void) => cb(''),
+    changeTextCallback: (_data: any, _evt: any, cb: (text: string) => void) => cb(''),
+  })
 
   const toolGroup = ToolGroupManager.createToolGroup(TOOL_GROUP_ID)!
   ;[
@@ -115,12 +122,28 @@ export async function initialiseCornerstonejs() {
   toolGroup.setToolActive(ZoomTool.toolName, {
     bindings: [{ mouseButton: ToolEnums.MouseBindings.Secondary }],
   })
+
+  // Set default annotation colour to green (Cornerstone default is yellow)
+  try {
+    const GREEN = 'rgb(0, 255, 0)'
+    cornerstoneTools.annotation.config.style.setToolGroupToolStyles(TOOL_GROUP_ID, {
+      global: {
+        color: GREEN,
+        colorHighlighted: GREEN,
+        colorSelected: GREEN,
+        colorLocked: GREEN,
+        textBoxColor: GREEN,
+        textBoxColorHighlighted: GREEN,
+        textBoxColorSelected: GREEN,
+        textBoxColorLocked: GREEN,
+      },
+    })
+  } catch {}
 }
 
 /**
- * Listen for annotation completion events and stamp the annotation object
- * with the current colour. This is the only reliable way to colour annotations
- * in Cornerstone Tools v1 — direct mutation of the annotation object's style.
+ * Listen for annotation completion events and apply the current colour
+ * using the correct Cornerstone Tools v1 API: setAnnotationStyles(uid, styles).
  */
 export function listenForNewAnnotations(getCurrentColor: () => string) {
   try {
@@ -129,15 +152,36 @@ export function listenForNewAnnotations(getCurrentColor: () => string) {
       try {
         const ann = evt.detail?.annotation
         if (!ann?.annotationUID) return
-        const color = getCurrentColor()
-        if (!ann.annotationStyle) ann.annotationStyle = {}
-        ann.annotationStyle.color = color
-        ann.annotationStyle.colorHighlighted = color
-        ann.annotationStyle.colorSelected = color
-        ann.annotationStyle.colorLocked = color
+        const hex = getCurrentColor()
+        const rgb = hexToRgb(hex)
+        cornerstoneTools.annotation.config.style.setAnnotationStyles(ann.annotationUID, {
+          color: rgb,
+          colorHighlighted: rgb,
+          colorSelected: rgb,
+          colorLocked: rgb,
+          textBoxColor: rgb,
+          textBoxColorHighlighted: rgb,
+          textBoxColorSelected: rgb,
+          textBoxColorLocked: rgb,
+        })
       } catch {}
     })
   } catch (e) {
     console.warn('Could not listen for annotation events', e)
   }
+}
+
+/** Convert #rrggbb or #rgb to rgb(r,g,b) string that Cornerstone expects */
+export function hexToRgb(hex: string): string {
+  const h = hex.replace('#', '')
+  if (h.length === 3) {
+    const r = parseInt(h[0]+h[0], 16)
+    const g = parseInt(h[1]+h[1], 16)
+    const b = parseInt(h[2]+h[2], 16)
+    return `rgb(${r},${g},${b})`
+  }
+  const r = parseInt(h.slice(0,2), 16)
+  const g = parseInt(h.slice(2,4), 16)
+  const b = parseInt(h.slice(4,6), 16)
+  return `rgb(${r},${g},${b})`
 }

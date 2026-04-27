@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import * as cornerstoneTools from '@cornerstonejs/tools'
 import { Trash2, Edit2, Check, X, Ruler } from 'lucide-react'
-import { useStore } from '../store/appStore'
-import { getEngine, VIEWPORT_ID } from '../utils/cornerstoneInit'
+import { getEngine, VIEWPORT_ID, hexToRgb } from '../utils/cornerstoneInit'
 import styles from '../styles/AnnotationsPanel.module.css'
 
 const PRESET_COLORS = ['#00ff00', '#ffff00', '#ff4444', '#4488ff', '#ff8800', '#ff44ff', '#ffffff']
@@ -32,19 +31,34 @@ function getMeasurement(ann: any): string {
   return ''
 }
 
-/** Get colour directly from the annotation object (our stamped annotationStyle) */
+/** Get colour from the Cornerstone style API for this annotation UID */
 function getAnnColor(ann: any): string {
-  return ann.annotationStyle?.color ?? '#00ff00'
+  try {
+    const styles = cornerstoneTools.annotation.config.style.getAnnotationToolStyles(ann.annotationUID)
+    if (styles?.color) {
+      // Convert rgb(r,g,b) back to hex for the colour input
+      const m = styles.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+      if (m) return '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('')
+    }
+  } catch {}
+  return '#00ff00'
 }
 
-/** Apply colour directly to the annotation object — no style API needed */
-function applyColor(ann: any, color: string) {
-  if (!ann) return
-  if (!ann.annotationStyle) ann.annotationStyle = {}
-  ann.annotationStyle.color = color
-  ann.annotationStyle.colorHighlighted = color
-  ann.annotationStyle.colorSelected = color
-  ann.annotationStyle.colorLocked = color
+/** Apply colour to an annotation using the correct Cornerstone v1 API */
+function applyColor(uid: string, hex: string) {
+  const rgb = hexToRgb(hex)
+  try {
+    cornerstoneTools.annotation.config.style.setAnnotationStyles(uid, {
+      color: rgb,
+      colorHighlighted: rgb,
+      colorSelected: rgb,
+      colorLocked: rgb,
+      textBoxColor: rgb,
+      textBoxColorHighlighted: rgb,
+      textBoxColorSelected: rgb,
+      textBoxColorLocked: rgb,
+    })
+  } catch {}
 }
 
 function triggerRender() {
@@ -55,7 +69,6 @@ function triggerRender() {
 }
 
 export function AnnotationsPanel() {
-  const { annotationColor, setAnnotationColor } = useStore()
   const [annotations, setAnnotations] = useState<AnnotationEntry[]>([])
   const [editingUid, setEditingUid] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
@@ -82,12 +95,9 @@ export function AnnotationsPanel() {
   }, [refresh])
 
   function setIndividualColor(uid: string, color: string) {
-    try {
-      const ann = cornerstoneTools.annotation.state.getAnnotation(uid) as any
-      applyColor(ann, color)
-      triggerRender()
-      setTimeout(refresh, 60)
-    } catch {}
+    applyColor(uid, color)
+    triggerRender()
+    setTimeout(refresh, 60)
   }
 
   function deleteAnnotation(uid: string) {
@@ -135,23 +145,6 @@ export function AnnotationsPanel() {
   return (
     <div className={styles.panel}>
       <div className={styles.header}>Annotations</div>
-
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>New annotation colour</div>
-        <div className={styles.colorRow}>
-          {PRESET_COLORS.map(c => (
-            <button key={c}
-              className={`${styles.colorSwatch} ${annotationColor === c ? styles.colorActive : ''}`}
-              style={{ background: c }}
-              onClick={() => setAnnotationColor(c)}
-              title={c}
-            />
-          ))}
-          <input type="color" value={annotationColor}
-            onChange={e => setAnnotationColor(e.target.value)}
-            className={styles.colorInput} title="Custom colour" />
-        </div>
-      </div>
 
       <div className={styles.listSection}>
         <div className={styles.sectionTitle}>Measurements ({annotations.length})</div>
