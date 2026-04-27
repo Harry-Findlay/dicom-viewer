@@ -20,8 +20,14 @@ jobs:
           cache: 'npm' # Speeds up future runs
 
       - name: Install dependencies
-        # 'npm ci' is preferred for CI/CD as it's faster and stricter than 'install'
         run: npm ci 
+
+      - name: Clean and Build
+        # Force a clean build to prevent stale minification maps
+        run: |
+          rm -rf dist
+          npm run build
+          npm run dist:mac
 
       - name: Build macOS app
         run: npm run dist:mac
