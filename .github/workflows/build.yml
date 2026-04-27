@@ -26,8 +26,8 @@ jobs:
       - name: Build macOS app
         run: npm run dist:mac
         env:
-          # This disables code signing for now so you can see if the build actually works
-          CSC_IDENTITY_AUTO_DISCOVERY: false 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This gives the builder permission
+          CSC_IDENTITY_AUTO_DISCOVERY: false        # Keeps code signing disabled
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
