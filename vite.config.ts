@@ -15,6 +15,7 @@ export default defineConfig({
   base: './',
   optimizeDeps: {
     exclude: ['sharp'],
+    include: ['@cornerstonejs/tools']
   },
   build: {
     outDir: 'dist',
