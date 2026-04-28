@@ -1,3 +1,4 @@
+// vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -8,8 +9,6 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src/renderer'),
     },
-    // Force Vite to use the 'require' condition (CJS) for Cornerstone
-    // packages to avoid their ESM circular dependency issues
     conditions: ['require', 'default'],
   },
   base: './',
@@ -31,7 +30,6 @@ export default defineConfig({
         warn(warning)
       },
       output: {
-        inlineDynamicImports: true,
         hoistTransitiveImports: false
       },
     },
