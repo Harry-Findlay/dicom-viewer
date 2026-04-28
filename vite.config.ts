@@ -7,8 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src/renderer'),
+      '@cornerstonejs/tools': '@cornerstonejs/tools/dist/umd/index.js',  // fix TDZ bug in ESM build
     },
-    // Remove conditions entirely
   },
   base: './',
   optimizeDeps: {
