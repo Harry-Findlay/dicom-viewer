@@ -25,9 +25,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@cornerstonejs/core": "1.72.1",
-    "@cornerstonejs/tools": "1.72.1",
-    "@cornerstonejs/dicom-image-loader": "1.72.1",
+    "@cornerstonejs/core": "1.86.1",
+    "@cornerstonejs/tools": "1.86.1",
+    "@cornerstonejs/dicom-image-loader": "1.86.0",
     "dcmjs": "0.29.8",
     "dicom-parser": "1.8.21",
     "sharp": "0.33.4",
