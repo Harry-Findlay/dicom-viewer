@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+
 jobs:
   build-mac:
     runs-on: macos-latest
@@ -16,6 +17,8 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
+      - name: Set version
+        run: npm version --no-git-tag-version 0.0.${{ github.run_number }}
       - name: Clean and Build
         run: |
           rm -rf dist
@@ -42,6 +45,8 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
+      - name: Set version
+        run: npm version --no-git-tag-version 0.0.${{ github.run_number }}
       - name: Clean and Build
         run: |
           Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
@@ -49,8 +54,38 @@ jobs:
           npm run dist:win
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload EXE
+      - name: Upload EXE Installer
         uses: actions/upload-artifact@v4
         with:
-          name: DICOM-Viewer-windows
-          path: release/*.exe
+          name: DICOM-Viewer-windows-installer
+          path: release/*Setup*.exe
+      - name: Upload EXE Portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: DICOM-Viewer-windows-portable
+          path: release/*Portable*.exe
+
+  release:
+    needs: [build-mac, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.0.${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated build from commit ${{ github.sha }}
+          files: |
+            artifacts/DICOM-Viewer-mac/*.dmg
+            artifacts/DICOM-Viewer-windows-installer/*.exe
+            artifacts/DICOM-Viewer-windows-portable/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
