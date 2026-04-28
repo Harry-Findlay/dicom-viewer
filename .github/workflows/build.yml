@@ -63,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DICOM-Viewer-windows-portable
-          path: release/!(*Setup*).exe
+          path: release/DICOM Viewer [0-9]*.exe
 
   release:
     needs: [build-mac, build-windows]
