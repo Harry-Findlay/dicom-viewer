@@ -7,12 +7,15 @@
   padding: 0 8px;
   gap: 4px;
   flex-shrink: 0;
-  /* macOS traffic lights spacing */
-  padding-left: env(titlebar-area-x, 8px);
   -webkit-app-region: drag;
   user-select: none;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+/* Push content past macOS traffic lights */
+:global([data-platform='mac']) .toolbar {
+  padding-left: 80px;
 }
 
 .toolbar > * {
