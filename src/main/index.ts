@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
+Menu.setApplicationMenu(null)
+
 // ── GPU acceleration ──────────────────────────────────────────────────────────
 app.commandLine.appendSwitch('enable-gpu-rasterization')
 app.commandLine.appendSwitch('enable-zero-copy')
@@ -43,45 +45,17 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'))
   }
 
-  setupMenu()
-}
-
-function setupMenu() {
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Open DICOM File(s)…',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => mainWindow?.webContents.send('menu:open-files'),
-        },
-        {
-          label: 'Open DICOMDIR…',
-          accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => mainWindow?.webContents.send('menu:open-dicomdir'),
-        },
-        { type: 'separator' },
-        {
-          label: 'Export Current Frame…',
-          accelerator: 'CmdOrCtrl+E',
-          click: () => mainWindow?.webContents.send('menu:export'),
-        },
-        { type: 'separator' },
-        { role: 'quit' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-  ]
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  // Keyboard shortcuts without a visible menu bar
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (!mainWindow) return
+    const ctrl = input.control || input.meta
+    if (input.type !== 'keyDown') return
+    if (ctrl && !input.shift && input.key === 'o') mainWindow.webContents.send('menu:open-files')
+    if (ctrl && input.shift && input.key === 'O') mainWindow.webContents.send('menu:open-dicomdir')
+    if (ctrl && input.key === 'e') mainWindow.webContents.send('menu:export')
+    if (input.key === 'F11') mainWindow.setFullScreen(!mainWindow.isFullScreen())
+    if (ctrl && input.shift && input.key === 'I') mainWindow.webContents.toggleDevTools()
+  })
 }
 
 // ── IPC: open DICOM files ─────────────────────────────────────────────────────
@@ -97,13 +71,10 @@ ipcMain.handle('dialog:open-dicom', async () => {
   return result.canceled ? null : result.filePaths
 })
 
-// DICOMDIR: allow selecting any file named DICOMDIR (no extension) or a folder
 ipcMain.handle('dialog:open-dicomdir', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
     title: 'Open DICOMDIR file',
-    filters: [
-      { name: 'All Files', extensions: ['*'] },
-    ],
+    filters: [{ name: 'All Files', extensions: ['*'] }],
     properties: ['openFile'],
   })
   return result.canceled ? null : result.filePaths[0]
@@ -129,10 +100,7 @@ ipcMain.handle('fs:list-dicom', async (_event, dirPath: string) => {
 
   function walk(dir: string) {
     let entries: fs.Dirent[]
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch { return }
-
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
     for (const entry of entries) {
       const full = path.join(dir, entry.name)
       if (entry.isDirectory()) {
@@ -140,7 +108,6 @@ ipcMain.handle('fs:list-dicom', async (_event, dirPath: string) => {
       } else {
         const ext = path.extname(entry.name).toLowerCase()
         const nameUpper = entry.name.toUpperCase()
-        // Include known extensions OR extensionless files that aren't DICOMDIR
         if (DICOM_EXTENSIONS.has(ext) || (ext === '' && nameUpper !== 'DICOMDIR')) {
           results.push(full)
         }
@@ -167,15 +134,9 @@ ipcMain.handle('export:save-image', async (_event, { dataUrl, format, defaultNam
   try {
     let outputBuffer = buffer
     if (ext === 'tiff' || ext === 'tif') {
-      try {
-        const sharp = require('sharp')
-        outputBuffer = await sharp(buffer).tiff({ compression: 'lzw' }).toBuffer()
-      } catch {}
+      try { const sharp = require('sharp'); outputBuffer = await sharp(buffer).tiff({ compression: 'lzw' }).toBuffer() } catch {}
     } else if (ext === 'jpg' || ext === 'jpeg') {
-      try {
-        const sharp = require('sharp')
-        outputBuffer = await sharp(buffer).jpeg({ quality: 95 }).toBuffer()
-      } catch {}
+      try { const sharp = require('sharp'); outputBuffer = await sharp(buffer).jpeg({ quality: 95 }).toBuffer() } catch {}
     }
     fs.writeFileSync(result.filePath, outputBuffer)
     shell.showItemInFolder(result.filePath)
@@ -187,9 +148,5 @@ ipcMain.handle('export:save-image', async (_event, { dataUrl, format, defaultNam
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(createWindow)
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow()
-})
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

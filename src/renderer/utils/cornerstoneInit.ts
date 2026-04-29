@@ -2,6 +2,7 @@ import * as cornerstone from '@cornerstonejs/core'
 import * as cornerstoneTools from '@cornerstonejs/tools'
 import cornerstoneDICOMImageLoader from '@cornerstonejs/dicom-image-loader'
 import dicomParser from 'dicom-parser'
+import { cornerstoneStreamingImageVolumeLoader } from '@cornerstonejs/streaming-image-volume-loader'
 
 const {
   ToolGroupManager, addTool, Enums: ToolEnums,
@@ -21,49 +22,84 @@ export const storeEngine = (e: cornerstone.RenderingEngine) => { _engine = e }
 
 let initialised = false
 
-// imageId → [rowSpacing, colSpacing] in mm, populated by registerImageSpacing()
-const spacingCache = new Map<string, [number, number]>()
+// Per-image spacing AND position cache
+interface ImagePlane {
+  rowMm: number
+  colMm: number
+  // imagePositionPatient as [x,y,z]
+  position: [number, number, number]
+  // imageOrientationPatient as 6 numbers
+  orientation: [number,number,number,number,number,number]
+  rows: number
+  columns: number
+  sliceThickness: number
+}
+
+const planeCache = new Map<string, ImagePlane>()
+
+export function registerImageSpacing(imageId: string, rowMm: number, colMm: number) {
+  const existing = planeCache.get(imageId)
+  if (existing) {
+    existing.rowMm = rowMm
+    existing.colMm = colMm
+  } else {
+    planeCache.set(imageId, {
+      rowMm, colMm,
+      position: [0, 0, 0],
+      orientation: [1,0,0,0,1,0],
+      rows: 512, columns: 512,
+      sliceThickness: 1,
+    })
+  }
+}
 
 /**
- * Call this after parsing a DICOM file so we know its pixel spacing before
- * Cornerstone tries to measure anything. imageId must match the wadouri: form.
+ * Register full plane metadata for a slice — called by dicomLoader for
+ * multi-frame CBCT so the volume loader gets correct geometry.
  */
-export function registerImageSpacing(imageId: string, rowMm: number, colMm: number) {
-  spacingCache.set(imageId, [rowMm, colMm])
+export function registerImagePlane(
+  imageId: string,
+  rowMm: number,
+  colMm: number,
+  position: [number,number,number],
+  orientation: [number,number,number,number,number,number],
+  rows: number,
+  columns: number,
+  sliceThickness: number,
+) {
+  planeCache.set(imageId, { rowMm, colMm, position, orientation, rows, columns, sliceThickness })
 }
 
 function registerMetadataProviders() {
-  // Our provider at priority 200 — above WADO (100).
-  // Returns imagePlaneModule with REAL pixel spacing from spacingCache
-  // (populated by dicomLoader from the actual DICOM tag 0028,0030).
   cornerstone.metaData.addProvider((type: string, imageId: string) => {
     if (type !== 'imagePlaneModule') return undefined
-    const spacing = spacingCache.get(imageId)
-    if (!spacing) return undefined  // not our image, let other providers handle
-
+    const p = planeCache.get(imageId)
+    if (!p) return undefined
     return {
-      imagePositionPatient:    [0, 0, 0],
-      imageOrientationPatient: [1, 0, 0, 0, 1, 0],
-      frameOfReferenceUID:     imageId,
-      pixelSpacing:            spacing,
-      rowPixelSpacing:         spacing[0],
-      columnPixelSpacing:      spacing[1],
-      rows:    512,
-      columns: 512,
+      imagePositionPatient:    p.position,
+      imageOrientationPatient: p.orientation,
+      frameOfReferenceUID:     'FRAME_OF_REF',
+      pixelSpacing:            [p.rowMm, p.colMm],
+      rowPixelSpacing:         p.rowMm,
+      columnPixelSpacing:      p.colMm,
+      rows:                    p.rows,
+      columns:                 p.columns,
+      sliceThickness:          p.sliceThickness,
     }
   }, 200)
 
-  // Safety net — priority 1, only fires if no other provider returned a result
+  // Fallback
   cornerstone.metaData.addProvider((type: string, imageId: string) => {
     if (type !== 'imagePlaneModule') return undefined
     return {
       imagePositionPatient:    [0, 0, 0],
       imageOrientationPatient: [1, 0, 0, 0, 1, 0],
-      frameOfReferenceUID:     imageId,
+      frameOfReferenceUID:     'FRAME_OF_REF',
       pixelSpacing:            [1, 1],
       rowPixelSpacing:         1,
       columnPixelSpacing:      1,
       rows: 512, columns: 512,
+      sliceThickness: 1,
     }
   }, 1)
 }
@@ -73,6 +109,12 @@ export async function initialiseCornerstonejs() {
   initialised = true
 
   await cornerstone.init()
+
+  cornerstone.volumeLoader.registerVolumeLoader(
+    'cornerstoneStreamingImageVolume',
+    cornerstoneStreamingImageVolumeLoader,
+  )
+
   registerMetadataProviders()
 
   cornerstoneDICOMImageLoader.external.cornerstone = cornerstone
@@ -98,8 +140,6 @@ export async function initialiseCornerstonejs() {
   addTool(EllipticalROITool); addTool(RectangleROITool)
   addTool(MagnifyTool)
 
-  // ArrowAnnotate: pass silent text callbacks via addTool configuration
-  // so prompt() is never called (it's blocked in Electron)
   addTool(ArrowAnnotateTool, {
     getTextCallback: (cb: (text: string) => void) => cb(''),
     changeTextCallback: (_data: any, _evt: any, cb: (text: string) => void) => cb(''),
@@ -123,28 +163,17 @@ export async function initialiseCornerstonejs() {
     bindings: [{ mouseButton: ToolEnums.MouseBindings.Secondary }],
   })
 
-  // Set default annotation colour to green (Cornerstone default is yellow)
   try {
     const GREEN = 'rgb(0, 255, 0)'
     cornerstoneTools.annotation.config.style.setToolGroupToolStyles(TOOL_GROUP_ID, {
       global: {
-        color: GREEN,
-        colorHighlighted: GREEN,
-        colorSelected: GREEN,
-        colorLocked: GREEN,
-        textBoxColor: GREEN,
-        textBoxColorHighlighted: GREEN,
-        textBoxColorSelected: GREEN,
-        textBoxColorLocked: GREEN,
+        color: GREEN, colorHighlighted: GREEN, colorSelected: GREEN, colorLocked: GREEN,
+        textBoxColor: GREEN, textBoxColorHighlighted: GREEN, textBoxColorSelected: GREEN, textBoxColorLocked: GREEN,
       },
     })
   } catch {}
 }
 
-/**
- * Listen for annotation completion events and apply the current colour
- * using the correct Cornerstone Tools v1 API: setAnnotationStyles(uid, styles).
- */
 export function listenForNewAnnotations(getCurrentColor: () => string) {
   try {
     const eventName = cornerstoneTools.Enums.Events.ANNOTATION_COMPLETED
@@ -155,14 +184,8 @@ export function listenForNewAnnotations(getCurrentColor: () => string) {
         const hex = getCurrentColor()
         const rgb = hexToRgb(hex)
         cornerstoneTools.annotation.config.style.setAnnotationStyles(ann.annotationUID, {
-          color: rgb,
-          colorHighlighted: rgb,
-          colorSelected: rgb,
-          colorLocked: rgb,
-          textBoxColor: rgb,
-          textBoxColorHighlighted: rgb,
-          textBoxColorSelected: rgb,
-          textBoxColorLocked: rgb,
+          color: rgb, colorHighlighted: rgb, colorSelected: rgb, colorLocked: rgb,
+          textBoxColor: rgb, textBoxColorHighlighted: rgb, textBoxColorSelected: rgb, textBoxColorLocked: rgb,
         })
       } catch {}
     })
@@ -171,7 +194,6 @@ export function listenForNewAnnotations(getCurrentColor: () => string) {
   }
 }
 
-/** Convert #rrggbb or #rgb to rgb(r,g,b) string that Cornerstone expects */
 export function hexToRgb(hex: string): string {
   const h = hex.replace('#', '')
   if (h.length === 3) {

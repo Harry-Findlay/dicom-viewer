@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+electron_1.Menu.setApplicationMenu(null);
 // ── GPU acceleration ──────────────────────────────────────────────────────────
 electron_1.app.commandLine.appendSwitch('enable-gpu-rasterization');
 electron_1.app.commandLine.appendSwitch('enable-zero-copy');
@@ -43,44 +44,24 @@ function createWindow() {
     else {
         mainWindow.loadFile(path_1.default.join(__dirname, '../../dist/index.html'));
     }
-    setupMenu();
-}
-function setupMenu() {
-    const template = [
-        {
-            label: 'File',
-            submenu: [
-                {
-                    label: 'Open DICOM File(s)…',
-                    accelerator: 'CmdOrCtrl+O',
-                    click: () => mainWindow?.webContents.send('menu:open-files'),
-                },
-                {
-                    label: 'Open DICOMDIR…',
-                    accelerator: 'CmdOrCtrl+Shift+O',
-                    click: () => mainWindow?.webContents.send('menu:open-dicomdir'),
-                },
-                { type: 'separator' },
-                {
-                    label: 'Export Current Frame…',
-                    accelerator: 'CmdOrCtrl+E',
-                    click: () => mainWindow?.webContents.send('menu:export'),
-                },
-                { type: 'separator' },
-                { role: 'quit' },
-            ],
-        },
-        {
-            label: 'View',
-            submenu: [
-                { role: 'reload' },
-                { role: 'toggleDevTools' },
-                { type: 'separator' },
-                { role: 'togglefullscreen' },
-            ],
-        },
-    ];
-    electron_1.Menu.setApplicationMenu(electron_1.Menu.buildFromTemplate(template));
+    // Keyboard shortcuts without a visible menu bar
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+        if (!mainWindow)
+            return;
+        const ctrl = input.control || input.meta;
+        if (input.type !== 'keyDown')
+            return;
+        if (ctrl && !input.shift && input.key === 'o')
+            mainWindow.webContents.send('menu:open-files');
+        if (ctrl && input.shift && input.key === 'O')
+            mainWindow.webContents.send('menu:open-dicomdir');
+        if (ctrl && input.key === 'e')
+            mainWindow.webContents.send('menu:export');
+        if (input.key === 'F11')
+            mainWindow.setFullScreen(!mainWindow.isFullScreen());
+        if (ctrl && input.shift && input.key === 'I')
+            mainWindow.webContents.toggleDevTools();
+    });
 }
 // ── IPC: open DICOM files ─────────────────────────────────────────────────────
 electron_1.ipcMain.handle('dialog:open-dicom', async () => {
@@ -94,13 +75,10 @@ electron_1.ipcMain.handle('dialog:open-dicom', async () => {
     });
     return result.canceled ? null : result.filePaths;
 });
-// DICOMDIR: allow selecting any file named DICOMDIR (no extension) or a folder
 electron_1.ipcMain.handle('dialog:open-dicomdir', async () => {
     const result = await electron_1.dialog.showOpenDialog(mainWindow, {
         title: 'Open DICOMDIR file',
-        filters: [
-            { name: 'All Files', extensions: ['*'] },
-        ],
+        filters: [{ name: 'All Files', extensions: ['*'] }],
         properties: ['openFile'],
     });
     return result.canceled ? null : result.filePaths[0];
@@ -136,7 +114,6 @@ electron_1.ipcMain.handle('fs:list-dicom', async (_event, dirPath) => {
             else {
                 const ext = path_1.default.extname(entry.name).toLowerCase();
                 const nameUpper = entry.name.toUpperCase();
-                // Include known extensions OR extensionless files that aren't DICOMDIR
                 if (DICOM_EXTENSIONS.has(ext) || (ext === '' && nameUpper !== 'DICOMDIR')) {
                     results.push(full);
                 }
@@ -183,11 +160,7 @@ electron_1.ipcMain.handle('export:save-image', async (_event, { dataUrl, format,
 });
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 electron_1.app.whenReady().then(createWindow);
-electron_1.app.on('activate', () => {
-    if (electron_1.BrowserWindow.getAllWindows().length === 0)
-        createWindow();
-});
-electron_1.app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin')
-        electron_1.app.quit();
-});
+electron_1.app.on('activate', () => { if (electron_1.BrowserWindow.getAllWindows().length === 0)
+    createWindow(); });
+electron_1.app.on('window-all-closed', () => { if (process.platform !== 'darwin')
+    electron_1.app.quit(); });

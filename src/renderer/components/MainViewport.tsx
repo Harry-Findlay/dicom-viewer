@@ -24,30 +24,54 @@ export function MainViewport() {
 
   const { activeSeries, activeSliceIndex, activeTool, viewportState, _resetToken, showAnnotations } = useStore()
 
-  // ── Init once ────────────────────────────────────────────────────────────────
+  // ── Init once, but only after the container has real pixel dimensions ────────
   useEffect(() => {
-    if (initialised.current || !containerRef.current) return
-    initialised.current = true
+    const container = containerRef.current
+    if (!container) return
 
-    const engine = new RenderingEngine(RENDERING_ENGINE_ID)
-    engineRef.current = engine
-    storeEngine(engine)
+    const ro = new ResizeObserver((entries) => {
+      if (initialised.current) return
+      const { width, height } = entries[0].contentRect
+      if (width === 0 || height === 0) return
 
-    engine.enableElement({
-      viewportId: VIEWPORT_ID,
-      type: CoreEnums.ViewportType.STACK,
-      element: containerRef.current,
-      defaultOptions: { background: [0, 0, 0] as [number, number, number] },
+      // Container now has size — safe to init Cornerstone
+      initialised.current = true
+      ro.disconnect()
+
+      const engine = new RenderingEngine(RENDERING_ENGINE_ID)
+      engineRef.current = engine
+      storeEngine(engine)
+
+      engine.enableElement({
+        viewportId: VIEWPORT_ID,
+        type: CoreEnums.ViewportType.STACK,
+        element: container,
+        defaultOptions: { background: [0, 0, 0] as [number, number, number] },
+      })
+
+      const toolGroup = ToolGroupManager.getToolGroup(TOOL_GROUP_ID)
+      toolGroup?.addViewport(VIEWPORT_ID, RENDERING_ENGINE_ID)
+
+      listenForNewAnnotations(() => useStore.getState().annotationColor)
+
+      // Load series if already set
+      const { activeSeries } = useStore.getState()
+      if (activeSeries) {
+        const vp = engine.getViewport(VIEWPORT_ID) as any
+        if (vp) {
+          loadedSeriesUID.current = activeSeries.seriesUID
+          vp.setStack(activeSeries.imageIds, 0)
+            .then(() => { vp.resetCamera(); vp.render(); syncVOIFromViewport(vp) })
+            .catch(console.error)
+        }
+      }
     })
 
-    const toolGroup = ToolGroupManager.getToolGroup(TOOL_GROUP_ID)
-    toolGroup?.addViewport(VIEWPORT_ID, RENDERING_ENGINE_ID)
-
-    // Stamp new annotations with the current colour when user finishes drawing
-    listenForNewAnnotations(() => useStore.getState().annotationColor)
+    ro.observe(container)
+    return () => ro.disconnect()
   }, [])
 
-  // ── Wheel (non-passive, reads store directly) ────────────────────────────────
+  // ── Wheel ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -141,16 +165,12 @@ export function MainViewport() {
   // ── Annotation visibility ────────────────────────────────────────────────────
   useEffect(() => {
     try {
-      // cornerstoneTools v1: annotation.visibility.setAnnotationVisibility
       const allAnnotations = annotation.state.getAllAnnotations()
       allAnnotations.forEach((ann: any) => {
         annotation.visibility.setAnnotationVisibility(ann.annotationUID, showAnnotations)
       })
-      // Trigger re-render
       const vp = engineRef.current?.getViewport(VIEWPORT_ID) as any
-      if (vp) {
-        cornerstoneTools.utilities.triggerAnnotationRender(vp.element)
-      }
+      if (vp) cornerstoneTools.utilities.triggerAnnotationRender(vp.element)
     } catch {}
   }, [showAnnotations])
 

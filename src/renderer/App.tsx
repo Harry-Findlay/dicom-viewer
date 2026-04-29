@@ -12,6 +12,7 @@ import { StatusBar } from './components/StatusBar'
 import { initialiseCornerstonejs } from './utils/cornerstoneInit'
 import { buildSeriesFromFiles, buildSeriesFromDicomdir } from './utils/dicomLoader'
 import styles from './styles/App.module.css'
+import { ViewportManager } from './components/ViewportManager'
 
 export default function App() {
   const {
@@ -114,7 +115,7 @@ export default function App() {
         )}
 
         {/* Main content area */}
-        <div className={styles.content}>
+        <div className={styles.content} style={{ display: 'flex', flexDirection: 'column' }}>
           {!hasContent ? (
             <WelcomeScreen
               isLoading={isLoading}
@@ -124,10 +125,10 @@ export default function App() {
               onOpenFolder={handleOpenFolder}
             />
           ) : (
-            <>
-              <MainViewport />
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <ViewportManager />
               {sliceStripVisible && <SliceStrip />}
-            </>
+            </div>
           )}
         </div>
 
